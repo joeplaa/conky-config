@@ -156,7 +156,7 @@ settings.net.y_speed_up             = settings.net.y_speed_down + settings.line.
 settings.net.y_speed_down2          = settings.net.y_speed_up + settings.line.interval
 settings.net.y_speed_up2            = settings.net.y_speed_down2 + settings.line.interval
 
-settings.data.separator             = settings.net.y_speed_up2 + 6.5 * settings.line.info_height
+settings.data.separator             = settings.net.y_speed_up2 + 4.5 * settings.line.info_height
 settings.data.y_speeds              = settings.data.separator + settings.line.section_text_interval
 settings.data.y_ssd_util            = settings.data.separator + settings.line.interval
 settings.data.y_sh1                 = settings.data.y_ssd_util + settings.line.interval
@@ -351,17 +351,18 @@ function draw_net()
 
     -- Network info
     local vals = {
-        "Total down (VLAN20): " .. download_total(),
-        "Total up (VLAN20):   " .. upload_total(),
-        "Total down (VLAN30): " .. download_total2(),
-        "Total up (VLAN30):   " .. upload_total2(),
+        "Total down:  " .. download_total(),
+        "Total up:    " .. upload_total(),
     }
 
-    local prefix = public_ip6:sub(1, 15)
-    if use_public_ip then
-        table.insert(vals, "PUB IPv4: " .. public_ip4)
-        table.insert(vals, "PUB IPv6: " .. prefix .. ":/48")
-        table.insert(vals, "VPN IPv4: " .. vpn_ip4)
+    local pub_prefix = wan_ip6:sub(1, 15)
+    local vpn_prefix = vpn_ip6:sub(1, 15)
+    if use_wan_ip then
+        table.insert(vals, "PUB IPv4:    " .. wan_ip4)
+        table.insert(vals, "PUB IPv6:    " .. pub_prefix .. ":/48")
+        table.insert(vals, "VPN IPv4:    " .. vpn_ip4)
+        --table.insert(vals, "VPN IPv6:    " .. vpn_prefix .. ":/48")
+        table.insert(vals, "VPN IPv6:    " .. vpn_ip6)
     end
 
     lanip6_values = local_ip6_lan():gsub("%s+", "")
@@ -370,19 +371,19 @@ function draw_net()
     first = true
     for value in string.gmatch(lanip6_values, "([^,]+)") do
         if first then
-            table.insert(vals, "LAN IPv6: " .. value)
+            table.insert(vals, "VLAN20 IPv6: " .. value)
             first = false
         else
-            table.insert(vals, "          " .. value)
+            table.insert(vals, "             " .. value)
         end
     end
     first = true
     for value in string.gmatch(sanip6_values, "([^,]+)") do
         if first then
-            table.insert(vals, "SAN IPv6: " .. value)
+            table.insert(vals, "VLAN30 IPv6: " .. value)
             first = false
         else
-            table.insert(vals, "          " .. value)
+            table.insert(vals, "             " .. value)
         end
     end
     write_line_by_line(settings.text.endx, settings.net.y_info_net, settings.line.info_height, vals, main_text_color, 12,
@@ -393,30 +394,16 @@ function draw_net()
     local upspeed = upload_speed()
     local downraw = tonumber(download_speed_raw())
     local upraw = tonumber(upload_speed_raw())
-    local downspeed2 = download_speed2()
-    local upspeed2 = upload_speed2()
-    local downraw2 = tonumber(download_speed_raw2())
-    local upraw2 = tonumber(upload_speed_raw2())
 
     rectangle_rightleft(settings.line.startx, settings.net.y_speed_down, settings.line.width_2, settings.line.thickness,
         downraw, net_rate_maximum, color_frompercent(downraw / net_rate_maximum))
     write(settings.text.centerxr, settings.net.y_speed_down - settings.line.height, downspeed, 12, main_text_color)
-    write(settings.text.startx, settings.net.y_speed_down - settings.line.height, "Down (VLAN20)", 12, main_text_color, "r")
+    write(settings.text.startx, settings.net.y_speed_down - settings.line.height, "Down", 12, main_text_color, "r")
 
     rectangle_rightleft(settings.line.startx, settings.net.y_speed_up, settings.line.width_2, settings.line.thickness,
         upraw, net_rate_maximum, color_frompercent(upraw / net_rate_maximum))
     write(settings.text.centerxr, settings.net.y_speed_up - settings.line.height, upspeed, 12, main_text_color)
-    write(settings.text.startx, settings.net.y_speed_up - settings.line.height, "Up (VLAN20)", 12, main_text_color, "r")
-
-    rectangle_rightleft(settings.line.startx, settings.net.y_speed_down2, settings.line.width_2, settings.line.thickness,
-        downraw2, net_rate_maximum, color_frompercent(downraw2 / net_rate_maximum))
-    write(settings.text.centerxr, settings.net.y_speed_down2 - settings.line.height, downspeed2, 12, main_text_color)
-    write(settings.text.startx, settings.net.y_speed_down2 - settings.line.height, "Down (VLAN30)", 12, main_text_color, "r")
-
-    rectangle_rightleft(settings.line.startx, settings.net.y_speed_up2, settings.line.width_2, settings.line.thickness,
-        upraw2, net_rate_maximum, color_frompercent(upraw2 / net_rate_maximum))
-    write(settings.text.centerxr, settings.net.y_speed_up2 - settings.line.height, upspeed2, 12, main_text_color)
-    write(settings.text.startx, settings.net.y_speed_up2 - settings.line.height, "Up (VLAN30)", 12, main_text_color, "r")
+    write(settings.text.startx, settings.net.y_speed_up - settings.line.height, "Up", 12, main_text_color, "r")
 end
 
 function draw_data()
@@ -478,17 +465,17 @@ function conky_main()
 
     local number_updates = tonumber(updates())
     if number_updates > time_before_start then
-        if use_public_ip then
-            if public_ip4 == nil or public_ip4 == "None" or (number_updates % public_ip_refresh_rate) == 0 then
-                public_ip4 = fetch_public_ip(4)
+        if use_wan_ip then
+            if wan_ip4 == nil or wan_ip4 == "None" or (number_updates % wan_ip_refresh_rate) == 0 then
+                wan_ip4 = fetch_wan_ip(4)
             end
-            if public_ip6 == nil or public_ip6 == "None" or (number_updates % public_ip_refresh_rate) == 0 then
-                public_ip6 = fetch_public_ip(6)
+            if wan_ip6 == nil or wan_ip6 == "None" or (number_updates % wan_ip_refresh_rate) == 0 then
+                wan_ip6 = fetch_wan_ip(6)
             end
-            if vpn_ip4 == nil or vpn_ip4 == "None" or (number_updates % public_ip_refresh_rate) == 0 then
+            if vpn_ip4 == nil or vpn_ip4 == "None" or (number_updates % vpn_ip_refresh_rate) == 0 then
                 vpn_ip4 = fetch_vpn_ip(4)
             end
-            if vpn_ip6 == nil or vpn_ip6 == "None" or (number_updates % public_ip_refresh_rate) == 0 then
+            if vpn_ip6 == nil or vpn_ip6 == "None" or (number_updates % vpn_ip_refresh_rate) == 0 then
                 vpn_ip6 = fetch_vpn_ip(6)
             end
         end

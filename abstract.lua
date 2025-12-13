@@ -383,19 +383,12 @@ function diskio(device)         return parse("diskio " .. device) .. "/s" end   
 function diskio_read(device)    return parse("diskio_read " .. device) .. "/s" end
 function diskio_write(device)   return parse("diskio_write " .. device) .. "/s" end
 --function diskiograph(device)    return parse("diskiograph " .. device) .. "/s" end      --  device ex: /dev/sda
-function fetch_public_ip(type)
-    local cmd = type == 4 and "/usr/bin/curl -m 2 -s https://ipinfo.io/ip" or "/usr/bin/curl -m 2 -s https://v6.ipinfo.io/ip"
-    -- local handle = io.popen(cmd)
+function fetch_wan_ip(type)
+    local cmd = type == 4 and "/usr/bin/curl -m 2 -s https://ipv4.icanhazip.com/" or "/usr/bin/curl -m 2 -s https://ipv6.icanhazip.com/"
     local result = parse("execi 60 " .. cmd)
-    -- local result = ""
-    -- if handle ~= nil then
-    --     result = handle:read("*a")
-    --     handle:close()
-    -- end
-    -- Log result for debugging
     local log = io.open("/tmp/conky_curl_debug.log", "a")
     if log then
-        log:write(os.date() .. " fetch_public_ip(" .. tostring(type) .. "): " .. result .. "\n")
+        log:write(os.date() .. " fetch_wan_ip(" .. tostring(type) .. "): " .. result .. "\n")
         log:close()
     end
     if result == nil or result == "" then
@@ -405,14 +398,8 @@ function fetch_public_ip(type)
     end
 end
 function fetch_vpn_ip(type)
-    -- local handle = io.popen("/usr/bin/curl -" .. type .. " -s ident.me")
-    local result = parse("execi 60 /usr/bin/curl -m 2 -" .. type .. " -s ident.me")
-    -- local result = ""
-    -- if handle ~= nil then
-    --     result = handle:read("*a")
-    --     handle:close()
-    -- end
-    -- Log result for debugging
+    local cmd = type == 4 and "natpmpc -g 10.2.0.1 | grep \"Public IP address\" | awk '{print $5}'" or "/usr/bin/curl -m 2 -s https://v6.ipinfo.io/ip"
+    local result = parse("execi 60 " .. cmd)
     local log = io.open("/tmp/conky_curl_debug.log", "a")
     if log then
         log:write(os.date() .. " fetch_vpn_ip(" .. tostring(type) .. "): " .. result .. "\n")

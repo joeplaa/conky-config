@@ -66,14 +66,15 @@ You can use _write() to choose another font
 main_font = "Mono"
 
 --[[
-the public ip is fetched from the internet.
+the WAN ip is fetched from the internet.
 There is no need to refresh it every second like the other values
-advice: use the variable public_ip instead of the function public_ip()
-which is called every `public_ip_refresh_rate` secondes
+advice: use the variable wan_ip instead of the function wan_ip()
+which is called every `wan_ip_refresh_rate` secondes
 ]]
-use_public_ip = true
-public_ip_refresh_rate = 60 -- seconds
-public_ip = nil
+use_wan_ip = true
+wan_ip_refresh_rate = 60 -- seconds
+wan_ip = nil
+vpn_ip_refresh_rate = 60 -- seconds
 vpn_ip = nil
 
 -- Stop editing
