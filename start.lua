@@ -151,12 +151,12 @@ settings.mem.y_usage                = settings.mem.y_swap + settings.line.interv
 
 settings.net.separator              = settings.mem.y_info + 10 * settings.line.info_height
 settings.net.y_info_net             = settings.net.separator + settings.line.section_text_interval
-settings.net.y_speed_down           = settings.net.separator + settings.line.interval
-settings.net.y_speed_up             = settings.net.y_speed_down + settings.line.interval
-settings.net.y_speed_down2          = settings.net.y_speed_up + settings.line.interval
+settings.net.y_speed_down2          = settings.net.separator + settings.line.interval
 settings.net.y_speed_up2            = settings.net.y_speed_down2 + settings.line.interval
+settings.net.y_speed_down           = settings.net.y_speed_up2 + settings.line.interval
+settings.net.y_speed_up             = settings.net.y_speed_down + settings.line.interval
 
-settings.data.separator             = settings.net.y_speed_up2 + 4.5 * settings.line.info_height
+settings.data.separator             = settings.net.y_speed_up + 4.5 * settings.line.info_height
 settings.data.y_speeds              = settings.data.separator + settings.line.section_text_interval
 settings.data.y_ssd_util            = settings.data.separator + settings.line.interval
 settings.data.y_sh1                 = settings.data.y_ssd_util + settings.line.interval
@@ -366,21 +366,21 @@ function draw_net()
     end
 
     lanip6_values = local_ip6_lan():gsub("%s+", "")
-    sanip6_values = local_ip6_san():gsub("%s+", "")
+    mgmtip6_values = local_ip6_mgmt():gsub("%s+", "")
 
     first = true
-    for value in string.gmatch(lanip6_values, "([^,]+)") do
+    for value in string.gmatch(mgmtip6_values, "([^,]+)") do
         if first then
-            table.insert(vals, "VLAN20 IPv6: " .. value)
+            table.insert(vals, "VLAN10 IPv6: " .. value)
             first = false
         else
             table.insert(vals, "             " .. value)
         end
     end
     first = true
-    for value in string.gmatch(sanip6_values, "([^,]+)") do
+    for value in string.gmatch(lanip6_values, "([^,]+)") do
         if first then
-            table.insert(vals, "VLAN30 IPv6: " .. value)
+            table.insert(vals, "VLAN20 IPv6: " .. value)
             first = false
         else
             table.insert(vals, "             " .. value)
@@ -394,15 +394,29 @@ function draw_net()
     local upspeed = upload_speed()
     local downraw = tonumber(download_speed_raw())
     local upraw = tonumber(upload_speed_raw())
+    local downspeed2 = download_speed2()
+    local upspeed2 = upload_speed2()
+    local downraw2 = tonumber(download_speed_raw2())
+    local upraw2 = tonumber(upload_speed_raw2())
 
-    rectangle_rightleft(settings.line.startx, settings.net.y_speed_down, settings.line.width_2, settings.line.thickness,
+    rectangle_rightleft(settings.line.startx, settings.net.y_speed_down2, settings.line.width_3, settings.line.thickness,
+        downraw2, net_rate_maximum2, color_frompercent(downraw2 / net_rate_maximum2))
+    write(settings.text.rightxl, settings.net.y_speed_down2 - settings.line.height, downspeed2, 12, main_text_color)
+    write(settings.text.startx, settings.net.y_speed_down2 - settings.line.height, "Down", 12, main_text_color, "r")
+
+    rectangle_rightleft(settings.line.startx, settings.net.y_speed_up2, settings.line.width_3, settings.line.thickness,
+        upraw2, net_rate_maximum2, color_frompercent(upraw2 / net_rate_maximum2))
+    write(settings.text.rightxl, settings.net.y_speed_up2 - settings.line.height, upspeed2, 12, main_text_color)
+    write(settings.text.startx, settings.net.y_speed_up2 - settings.line.height, "Up", 12, main_text_color, "r")
+
+    rectangle_rightleft(settings.line.startx, settings.net.y_speed_down, settings.line.width_3, settings.line.thickness,
         downraw, net_rate_maximum, color_frompercent(downraw / net_rate_maximum))
-    write(settings.text.centerxr, settings.net.y_speed_down - settings.line.height, downspeed, 12, main_text_color)
+    write(settings.text.rightxl, settings.net.y_speed_down - settings.line.height, downspeed, 12, main_text_color)
     write(settings.text.startx, settings.net.y_speed_down - settings.line.height, "Down", 12, main_text_color, "r")
 
-    rectangle_rightleft(settings.line.startx, settings.net.y_speed_up, settings.line.width_2, settings.line.thickness,
+    rectangle_rightleft(settings.line.startx, settings.net.y_speed_up, settings.line.width_3, settings.line.thickness,
         upraw, net_rate_maximum, color_frompercent(upraw / net_rate_maximum))
-    write(settings.text.centerxr, settings.net.y_speed_up - settings.line.height, upspeed, 12, main_text_color)
+    write(settings.text.rightxl, settings.net.y_speed_up - settings.line.height, upspeed, 12, main_text_color)
     write(settings.text.startx, settings.net.y_speed_up - settings.line.height, "Up", 12, main_text_color, "r")
 end
 

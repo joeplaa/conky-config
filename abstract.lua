@@ -361,15 +361,15 @@ function upload_total()         return parse("totalup " .. net_interface1) end
 --function upspeedgraph()         return parse("upspeedgraph" .. net_interface1) end
 function local_ip4_lan()        return parse("addrs " .. ip_interface1) end               --  ex: 192.168.178.25
 function local_ip6_lan()        return parse("v6addrs " .. ip_interface1) end               --  ex: 
-function download_speed2()      return parse("downspeed " .. net_interface1_v0) .. "/s" end   --  ex: 930B or 3kb
-function download_speed_raw2()  return parse("downspeedf " .. net_interface1_v0) end
-function download_total2()      return parse("totaldown " .. net_interface1_v0) end
---function downspeedgraph2()     return parse("downspeedgraph" .. net_interface1_v0) end
-function upload_speed2()        return parse("upspeed " .. net_interface1_v0) .. "/s" end     --  ex: 930B or 3kb
-function upload_speed_raw2()    return parse("upspeedf " .. net_interface1_v0) end
-function upload_total2()        return parse("totalup " .. net_interface1_v0) end
---function upspeedgraph2()        return parse("upspeedgraph" .. net_interface1_v0) end
-function local_ip6_san()        return parse("v6addrs " .. ip_interface1_v0) end               --  ex: 
+function download_speed2()      return parse("downspeed " .. net_interface0) .. "/s" end   --  ex: 930B or 3kb
+function download_speed_raw2()  return parse("downspeedf " .. net_interface0) end
+function download_total2()      return parse("totaldown " .. net_interface0) end
+--function downspeedgraph2()     return parse("downspeedgraph" .. net_interface0) end
+function upload_speed2()        return parse("upspeed " .. net_interface0) .. "/s" end     --  ex: 930B or 3kb
+function upload_speed_raw2()    return parse("upspeedf " .. net_interface0) end
+function upload_total2()        return parse("totalup " .. net_interface0) end
+--function upspeedgraph2()        return parse("upspeedgraph" .. net_interface0) end
+function local_ip6_mgmt()        return parse("v6addrs " .. ip_interface0) end               --  ex: 
 function uptime()               return parse("uptime") end                              --  ex: 2d 13h 40m
 function time_hrmin()           return parse("time %R") end                             --  ex: 15:40
 function time_hrminsec()        return parse("time %T") end                             --  ex: 15:30:25

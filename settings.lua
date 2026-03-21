@@ -35,10 +35,10 @@ EDIT THIS to match your network interface.
 You can find out by executing `ifconfig` or `ip link`.
 It might be "wlan0", "eth0", "wlp3s0" or something else
 ]]
-net_interface1    = "enp179s0"   --physical interface
-ip_interface1     = "br0"        --physical interface for ip monitoring
-net_interface1_v0 = "enp179s0v0" --virtual interface 1
-ip_interface1_v0  = "vlan30"     --virtual interface 1 for ip monitoring
+net_interface1 = "enp179s0" --interface 1 for network monitoring
+ip_interface1  = "br0"      --interface 1 for ip monitoring
+net_interface0 = "eno1"     --interface 0 for network monitoring
+ip_interface0  = "eno1"     --interface 0 for ip monitoring
 
 --[[
 this depends on your own internet speed
@@ -50,8 +50,10 @@ upload_rate_maximum = upload_rate_max * 122.0703125     -- KiB
 --[[
 this depends on your own network speed
 ]]
-net_rate_max = 10                             -- gbit
-net_rate_maximum = net_rate_max * 122070.3125 -- KiB
+net_rate_max = 10                               -- gbit
+net_rate_maximum = net_rate_max * 122070.3125   -- KiB
+net_rate_max2 = 1                               -- gbit
+net_rate_maximum2 = net_rate_max2 * 122070.3125 -- KiB
 
 --[[
 Max theoretical drive speeds
