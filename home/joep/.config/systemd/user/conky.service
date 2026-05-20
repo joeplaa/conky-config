@@ -5,8 +5,8 @@ Wants=default.target
 
 [Service]
 ExecStartPre=/bin/sleep 5
-ExecStart=/home/joep/repositories/joeplaa/joeplaa-conky/start_conky.sh
-WorkingDirectory=/home/joep/repositories/joeplaa/joeplaa-conky
+ExecStart=/home/joep/repositories/joeplaa/conky-config/start_conky.sh
+WorkingDirectory=/home/joep/repositories/joeplaa/conky-config
 Environment=DISPLAY=:1
 Restart=always
 RestartSec=3
