@@ -264,7 +264,7 @@ end
 function draw_gpu()
     write_bold(settings.line.endx, settings.gpu.separator + settings.line.height / 2, "GPU: " .. gpu_name(0), 12,
         main_text_color)
-    line(settings.line.startx, settings.gpu.separator, settings.line.endx + 180, settings.gpu.separator,
+    line(settings.line.startx, settings.gpu.separator, settings.line.endx + 280, settings.gpu.separator,
         settings.line.thickness, main_text_color, 1)
 
     local gpufan        = tonumber(gpu_fanspeed(0)) or 0
