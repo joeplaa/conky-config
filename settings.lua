@@ -35,7 +35,7 @@ EDIT THIS to match your network interface.
 You can find out by executing `ifconfig` or `ip link`.
 It might be "wlan0", "eth0", "wlp3s0" or something else
 ]]
-net_interface1 = "enp179s0" --interface 1 for network monitoring
+net_interface1 = "encx31"   --interface 1 for network monitoring
 ip_interface1  = "br0"      --interface 1 for ip monitoring
 net_interface0 = "eno1"     --interface 0 for network monitoring
 ip_interface0  = "eno1"     --interface 0 for ip monitoring
