@@ -183,8 +183,9 @@ function draw_clock()
 end
 
 function draw_info()
-    write_bold(settings.line.endx, settings.info.separator + settings.line.height / 2, "SYSTEM", 12, main_text_color)
-    line(settings.line.startx, settings.info.separator, settings.line.endx + 56, settings.info.separator,
+    write_bold(settings.line.endx, settings.info.separator + settings.line.height / 2,
+        "SYSTEM: " .. machine_host_label(), 12, main_text_color)
+    line(settings.line.startx, settings.info.separator, settings.line.endx + 320, settings.info.separator,
         settings.line.thickness, main_text_color, 1)
 
     local vals = {
@@ -246,18 +247,22 @@ function draw_cpu()
 
     for thread = 1, cpu_cores do
         y = settings.cpu.y_util + (thread - 1) * settings.line.interval
-        rectangle_rightleft(settings.line.utilxr, y, settings.line.width_4, settings.line.thickness, cpu_percent(thread),
-            100, color_frompercent(tonumber(cpu_percent(thread))))
-        write(settings.text.centerxr, y - settings.line.height, cpu_percent(thread) .. "%", 12, main_text_color)
-        write(settings.text.utilxr, y - settings.line.height, cpu_freq(thread) .. " MHz", 12, main_text_color, "r")
+        local pct = cpu_percent(thread)
+        local freq = cpu_freq(thread)
+        rectangle_rightleft(settings.line.utilxr, y, settings.line.width_4, settings.line.thickness, pct,
+            100, color_frompercent(tonumber(pct)))
+        write(settings.text.centerxr, y - settings.line.height, pct .. "%", 12, main_text_color)
+        write(settings.text.utilxr, y - settings.line.height, freq .. " MHz", 12, main_text_color, "r")
     end
 
     for thread = cpu_cores + 1, cpu_threads do
         y = settings.cpu.y_util + (thread - 7) * settings.line.interval
-        rectangle_rightleft(settings.line.startx, y, settings.line.width_4, settings.line.thickness, cpu_percent(thread),
-            100, color_frompercent(tonumber(cpu_percent(thread))))
-        write(settings.text.utilxl, y - settings.line.height, cpu_percent(thread) .. "%", 12, main_text_color)
-        write(settings.text.startx, y - settings.line.height, cpu_freq(thread) .. " MHz", 12, main_text_color, "r")
+        local pct = cpu_percent(thread)
+        local freq = cpu_freq(thread)
+        rectangle_rightleft(settings.line.startx, y, settings.line.width_4, settings.line.thickness, pct,
+            100, color_frompercent(tonumber(pct)))
+        write(settings.text.utilxl, y - settings.line.height, pct .. "%", 12, main_text_color)
+        write(settings.text.startx, y - settings.line.height, freq .. " MHz", 12, main_text_color, "r")
     end
 end
 
@@ -269,11 +274,14 @@ function draw_gpu()
 
     local gpufan        = tonumber(gpu_fanspeed(0)) or 0
     local gpupowerdraw  = tonumber(gpu_power_draw(0)) or 0
-    local gpupowerlimit = tonumber(gpu_power_limit(0)) or 75
+    local gpupowerlimit = tonumber(gpu_power_limit(0)) or 180
     local gpuutil       = tonumber(gpu_utilization(0)) or 0
     local gpumemused    = tonumber(gpu_mem_used(0)) or 0
     local gpumemtotal   = tonumber(gpu_mem_total(0)) or 0
-    local gpumemutil    = math.floor(gpumemused / gpumemtotal * 100)
+    local gpumemutil    = 0
+    if gpumemtotal > 0 then
+        gpumemutil = math.floor(gpumemused / gpumemtotal * 100)
+    end
     local gpuencode     = tonumber(gpu_encode(0)) or 0
     local gpudecode     = tonumber(gpu_decode(0)) or 0
 
@@ -434,15 +442,13 @@ function draw_data()
     write(settings.text.midxl, settings.data.y_ssd_util - settings.line.height, rootperc .. "%", 12, main_text_color)
     write(settings.text.startx, settings.data.y_ssd_util - settings.line.height, root, 12, main_text_color, "r")
 
-    -- Network volumes
-    local jodibooks     = string.format("/media/jodibooks-share: %s / %s", fs_used("/media/jodibooks-share"),
-        fs_size("/media/jodibooks-share"))
-    local joediapna     = string.format("/media/joediapna-share: %s / %s", fs_used("/media/joediapna-share"),
-        fs_size("/media/joediapna-share"))
-    local user          = string.format("/media/joep: %s / %s", fs_used("/media/joep"), fs_size("/media/joep"))
-    local jodibooksperc = tonumber(fs_used_perc("/media/jodibooks-share"))
-    local joediapnaperc = tonumber(fs_used_perc("/media/joediapna-share"))
-    local userperc      = tonumber(fs_used_perc("/media/joep"))
+    -- Network volumes (batched df, refreshed every net_fs_refresh_rate seconds)
+    local jb_used, jb_size, jodibooksperc = net_fs_stats("/media/jodibooks-share")
+    local jd_used, jd_size, joediapnaperc = net_fs_stats("/media/joediapna-share")
+    local u_used, u_size, userperc = net_fs_stats("/media/joep")
+    local jodibooks = string.format("/media/jodibooks-share: %s / %s", jb_used, jb_size)
+    local joediapna = string.format("/media/joediapna-share: %s / %s", jd_used, jd_size)
+    local user = string.format("/media/joep: %s / %s", u_used, u_size)
 
     rectangle_rightleft(settings.line.startx, settings.data.y_sh1, settings.line.width_5, settings.line.thickness,
         jodibooksperc, 100, color_frompercent(jodibooksperc))
@@ -480,16 +486,16 @@ function conky_main()
     local number_updates = tonumber(updates())
     if number_updates > time_before_start then
         if use_wan_ip then
-            if wan_ip4 == nil or wan_ip4 == "None" or (number_updates % wan_ip_refresh_rate) == 0 then
+            if wan_ip4 == nil or (number_updates % wan_ip_refresh_rate) == 0 then
                 wan_ip4 = fetch_wan_ip(4)
             end
-            if wan_ip6 == nil or wan_ip6 == "None" or (number_updates % wan_ip_refresh_rate) == 0 then
+            if wan_ip6 == nil or (number_updates % wan_ip_refresh_rate) == 0 then
                 wan_ip6 = fetch_wan_ip(6)
             end
-            if vpn_ip4 == nil or vpn_ip4 == "None" or (number_updates % vpn_ip_refresh_rate) == 0 then
+            if vpn_ip4 == nil or (number_updates % vpn_ip_refresh_rate) == 0 then
                 vpn_ip4 = fetch_vpn_ip(4)
             end
-            if vpn_ip6 == nil or vpn_ip6 == "None" or (number_updates % vpn_ip_refresh_rate) == 0 then
+            if vpn_ip6 == nil or (number_updates % vpn_ip_refresh_rate) == 0 then
                 vpn_ip6 = fetch_vpn_ip(6)
             end
         end

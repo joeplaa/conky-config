@@ -78,6 +78,17 @@ wan_ip_refresh_rate = 60 -- seconds
 wan_ip = nil
 vpn_ip_refresh_rate = 60 -- seconds
 vpn_ip = nil
+debug_wan = false
+
+--[[
+Network mount paths shown in STORAGE (refreshed via batched df, not every second)
+]]
+net_fs_refresh_rate = 30 -- seconds
+net_fs_mounts = {
+    "/media/jodibooks-share",
+    "/media/joediapna-share",
+    "/media/joep",
+}
 
 -- Stop editing
 ----------------------------------------------

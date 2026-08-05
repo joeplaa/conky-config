@@ -251,17 +251,143 @@ function break_after_first_word(str, delimiter)
     return first_word
 end
 
--- string utils
-function string:contains(substr)
+-- string utils (dot-style + @param self so LuaLS types self as string, not stringlib)
+---@param self string
+---@param substr string
+---@return boolean
+function string.contains(self, substr)
     return self:find(substr, 1, true) ~= nil
 end
 
-function string:startswith(start)
-    return self:sub(1, #start) == start
+---@param self string
+---@param prefix string
+---@return boolean
+function string.startswith(self, prefix)
+    return self:sub(1, #prefix) == prefix
 end
 
-function string:endswith(ending)
+---@param self string
+---@param ending string
+---@return boolean
+function string.endswith(self, ending)
     return ending == "" or self:sub(-#ending) == ending
+end
+
+local static_cache = {}
+local gpu_snapshot = { stamp = -1, gpus = {} }
+local net_fs_cache = {}
+local net_fs_df_cmd = nil
+
+local function trim(s)
+    if s == nil then return "" end
+    return (tostring(s):gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function read_dmi_id(id)
+    local f = io.open("/sys/class/dmi/id/" .. id, "r")
+    if not f then
+        return ""
+    end
+    local value = trim(f:read("*l") or "")
+    f:close()
+    return value
+end
+
+
+local function human_bytes(b)
+    b = tonumber(b) or 0
+    if b < 1024 then
+        return b .. "B"
+    end
+    local units = { "KiB", "MiB", "GiB", "TiB" }
+    local value = b / 1024
+    local unit = 1
+    while value >= 1024 and unit < #units do
+        value = value / 1024
+        unit = unit + 1
+    end
+    if value >= 100 then
+        return string.format("%.0f%s", value, units[unit])
+    end
+    return string.format("%.2f%s", value, units[unit])
+end
+
+local GPU_SMI_QUERY =
+    "/usr/bin/nvidia-smi --query-gpu=name,temperature.gpu,fan.speed,utilization.gpu,utilization.decoder,utilization.encoder,memory.used,memory.total,power.draw,power.limit --format=csv,noheader,nounits"
+
+local function refresh_gpu_snapshot()
+    local stamp = tonumber(updates()) or 0
+    if gpu_snapshot.stamp == stamp then
+        return
+    end
+    gpu_snapshot.stamp = stamp
+    gpu_snapshot.gpus = {}
+    local raw = trim(parse("execi 1 " .. GPU_SMI_QUERY))
+    if raw == "" then
+        return
+    end
+    for line in raw:gmatch("[^\r\n]+") do
+        local name, temp, fan, util, dec, enc, mem_used, mem_total, pdraw, plimit =
+            line:match("^([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*),([^,]*)$")
+        if name then
+            table.insert(gpu_snapshot.gpus, {
+                name = trim(name),
+                temp = trim(temp),
+                fan = trim(fan),
+                util = trim(util),
+                decode = trim(dec),
+                encode = trim(enc),
+                mem_used = trim(mem_used),
+                mem_total = trim(mem_total),
+                power_draw = trim(pdraw),
+                power_limit = trim(plimit),
+            })
+        end
+    end
+end
+
+local function gpu_row(gpu)
+    refresh_gpu_snapshot()
+    return gpu_snapshot.gpus[(tonumber(gpu) or 0) + 1]
+end
+
+local function net_fs_df_command()
+    if net_fs_df_cmd ~= nil then
+        return net_fs_df_cmd
+    end
+    net_fs_df_cmd = "df -B1 --output=target,used,size " .. table.concat(net_fs_mounts, " ")
+    return net_fs_df_cmd
+end
+
+local function refresh_net_fs_cache()
+    local raw = parse("execi " .. tostring(net_fs_refresh_rate) .. " " .. net_fs_df_command()) or ""
+    for line in raw:gmatch("[^\r\n]+") do
+        if not line:match("^Mounted") and not line:match("^Filesystem") then
+            local target, used, size = line:match("^(%S+)%s+(%d+)%s+(%d+)")
+            if target and used and size then
+                local used_n = tonumber(used) or 0
+                local size_n = tonumber(size) or 0
+                local perc = 0
+                if size_n > 0 then
+                    perc = math.floor(used_n / size_n * 100)
+                end
+                net_fs_cache[target] = {
+                    used_h = human_bytes(used_n),
+                    size_h = human_bytes(size_n),
+                    perc = perc,
+                }
+            end
+        end
+    end
+end
+
+function net_fs_stats(mount)
+    refresh_net_fs_cache()
+    local stats = net_fs_cache[mount]
+    if stats then
+        return stats.used_h, stats.size_h, stats.perc
+    end
+    return "—", "—", 0
 end
 
 -- functions to fetch some important system info
@@ -276,7 +402,52 @@ function arch()                 return parse("machine") end                 --  
 --function desktop()              return parse("desktop") end                 --  ex: 3 (current desktop)
 --function desktop_name()         return parse("desktop_name") end            --  ex: Desktop 3
 --function username()             return parse("user_names") end
-function cpu_name()             return parse("exec cat /proc/cpuinfo | grep 'name'| uniq | cut -c 14-54") end
+function cpu_name()
+    if static_cache.cpu_name_ready then
+        return static_cache.cpu_name
+    end
+    local name = ""
+    local f = io.open("/proc/cpuinfo", "r")
+    if f then
+        for line in f:lines() do
+            local model = line:match("^model name%s*:%s*(.+)$")
+            if model then
+                name = trim(model)
+                break
+            end
+        end
+        f:close()
+    end
+    if name == "" then
+        name = trim(parse("exec cat /proc/cpuinfo | grep 'name'| uniq | cut -c 14-54"))
+    end
+    if name ~= "" then
+        static_cache.cpu_name = name
+        static_cache.cpu_name_ready = true
+    end
+    return name
+end
+
+function machine_host_label()
+    if static_cache.machine_host_label_ready then
+        return static_cache.machine_host_label
+    end
+    local product = read_dmi_id("product_name")
+    local version = read_dmi_id("product_version")
+    if product == "" then
+        product = hostname()
+    end
+    local label
+    if version ~= "" then
+        label = "Host: " .. product .. " (" .. version .. ")"
+    else
+        label = "Host: " .. product
+    end
+    static_cache.machine_host_label = label
+    static_cache.machine_host_label_ready = true
+    return label
+end
+
 function cpu_temperature()      return parse("hwmon 1 temp 1") end --  temperature in C°
 --function cpu_fanspeed()         return parse("hwmon 2 fan 2") end --  speed in RPM
 function cpu_percent(n)
@@ -315,17 +486,57 @@ function fs_free(fs)
     else                        return parse("fs_free " .. fs)
     end
 end
-function gpu_name(gpu)          return "Nvidia " .. parse("exec /usr/bin/nvidia-smi --query-gpu=gpu_name --format=csv | sed -n " .. gpu + 2 .. "p") end
-function gpu_temp(gpu)          return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=temperature.gpu --format=csv | sed -n " .. gpu + 2 .. "p") end
-function gpu_fanspeed(gpu)      return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=fan.speed --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_utilization(gpu)   return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=utilization.gpu --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_decode(gpu)        return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=utilization.decoder --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_encode(gpu)        return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=utilization.encoder --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_mem_util(gpu)      return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=utilization.memory --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_mem_used(gpu)      return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=memory.used --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_mem_total(gpu)     return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=memory.total --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_power_draw(gpu)    return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=power.draw --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
-function gpu_power_limit(gpu)   return parse("execi 1 /usr/bin/nvidia-smi --query-gpu=power.limit --format=csv | sed -n " .. gpu + 2 .. "p | cut -d ' ' -f 1") end
+function gpu_name(gpu)
+    local row = gpu_row(gpu)
+    if row and row.name ~= "" then
+        return "Nvidia " .. row.name
+    end
+    return "Nvidia "
+end
+function gpu_temp(gpu)
+    local row = gpu_row(gpu)
+    return row and row.temp or ""
+end
+function gpu_fanspeed(gpu)
+    local row = gpu_row(gpu)
+    return row and row.fan or ""
+end
+function gpu_utilization(gpu)
+    local row = gpu_row(gpu)
+    return row and row.util or ""
+end
+function gpu_decode(gpu)
+    local row = gpu_row(gpu)
+    return row and row.decode or ""
+end
+function gpu_encode(gpu)
+    local row = gpu_row(gpu)
+    return row and row.encode or ""
+end
+function gpu_mem_util(gpu)
+    local row = gpu_row(gpu)
+    if not row then return "" end
+    local used = tonumber(row.mem_used) or 0
+    local total = tonumber(row.mem_total) or 0
+    if total <= 0 then return "0" end
+    return tostring(math.floor(used / total * 100))
+end
+function gpu_mem_used(gpu)
+    local row = gpu_row(gpu)
+    return row and row.mem_used or ""
+end
+function gpu_mem_total(gpu)
+    local row = gpu_row(gpu)
+    return row and row.mem_total or ""
+end
+function gpu_power_draw(gpu)
+    local row = gpu_row(gpu)
+    return row and row.power_draw or ""
+end
+function gpu_power_limit(gpu)
+    local row = gpu_row(gpu)
+    return row and row.power_limit or ""
+end
 -- function vm_used(vm)            return parse("execi 60 virsh vol-info " .. vm .. " --pool " .. pool_name .. " | grep Allocation | awk '{print$2 $3}'") end
 -- function vm_size(vm)            return parse("execi 60 virsh vol-info " .. vm .. " --pool " .. pool_name .. " | grep Capacity | awk '{print$2 $3}'") end
 -- function vm_used_perc(vm)
@@ -386,29 +597,33 @@ function diskio_write(device)   return parse("diskio_write " .. device) .. "/s" 
 function fetch_wan_ip(type)
     local cmd = type == 4 and "/usr/bin/curl -m 2 -s https://ipv4.icanhazip.com/" or "/usr/bin/curl -m 2 -s https://ipv6.icanhazip.com/"
     local result = parse("execi 60 " .. cmd)
-    local log = io.open("/tmp/conky_curl_debug.log", "a")
-    if log then
-        log:write(os.date() .. " fetch_wan_ip(" .. tostring(type) .. "): " .. result .. "\n")
-        log:close()
+    if debug_wan then
+        local log = io.open("/tmp/conky_curl_debug.log", "a")
+        if log then
+            log:write(os.date() .. " fetch_wan_ip(" .. tostring(type) .. "): " .. result .. "\n")
+            log:close()
+        end
     end
     if result == nil or result == "" then
         return "None"
     else
-        return result
+        return trim(result)
     end
 end
 function fetch_vpn_ip(type)
     local cmd = type == 4 and "natpmpc -g 10.2.0.1 | grep \"Public IP address\" | awk '{print $5}'" or "/usr/bin/curl -m 2 -s https://v6.ipinfo.io/ip"
     local result = parse("execi 60 " .. cmd)
-    local log = io.open("/tmp/conky_curl_debug.log", "a")
-    if log then
-        log:write(os.date() .. " fetch_vpn_ip(" .. tostring(type) .. "): " .. result .. "\n")
-        log:close()
+    if debug_wan then
+        local log = io.open("/tmp/conky_curl_debug.log", "a")
+        if log then
+            log:write(os.date() .. " fetch_vpn_ip(" .. tostring(type) .. "): " .. result .. "\n")
+            log:close()
+        end
     end
     if result == nil or result == "" then
         return "None"
     else
-        return result
+        return trim(result)
     end
 end
 
