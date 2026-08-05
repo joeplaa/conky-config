@@ -185,7 +185,7 @@ end
 function draw_info()
     write_bold(settings.line.endx, settings.info.separator + settings.line.height / 2,
         "SYSTEM: " .. machine_host_label(), 12, main_text_color)
-    line(settings.line.startx, settings.info.separator, settings.line.endx + 320, settings.info.separator,
+    line(settings.line.startx, settings.info.separator, settings.line.endx + 280, settings.info.separator,
         settings.line.thickness, main_text_color, 1)
 
     local vals = {

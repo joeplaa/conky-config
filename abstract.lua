@@ -439,9 +439,9 @@ function machine_host_label()
     end
     local label
     if version ~= "" then
-        label = "Host: " .. product .. " (" .. version .. ")"
+        label = product .. " (" .. version .. ")"
     else
-        label = "Host: " .. product
+        label = product
     end
     static_cache.machine_host_label = label
     static_cache.machine_host_label_ready = true
