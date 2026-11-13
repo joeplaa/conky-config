@@ -283,6 +283,20 @@ local function trim(s)
     return (tostring(s):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+--- Run a shell command synchronously from Lua (used by WAN/VPN IP fetch).
+--- Conky ${execi} via conky_parse often returns empty inside lua_draw_hook on early ticks.
+---@param cmd string full shell command (pipes allowed; routed through /bin/sh)
+---@return string trimmed stdout, or "" on failure
+local function run_shell_cmd(cmd)
+    local handle = io.popen(cmd .. " 2>/dev/null")
+    if handle == nil then
+        return ""
+    end
+    local result = trim(handle:read("*a") or "")
+    handle:close()
+    return result
+end
+
 local function read_dmi_id(id)
     local f = io.open("/sys/class/dmi/id/" .. id, "r")
     if not f then
@@ -595,8 +609,10 @@ function diskio_read(device)    return parse("diskio_read " .. device) .. "/s" e
 function diskio_write(device)   return parse("diskio_write " .. device) .. "/s" end
 --function diskiograph(device)    return parse("diskiograph " .. device) .. "/s" end      --  device ex: /dev/sda
 function fetch_wan_ip(type)
-    local cmd = type == 4 and "/usr/bin/curl -m 2 -s https://ipv4.icanhazip.com/" or "/usr/bin/curl -m 2 -s https://ipv6.icanhazip.com/"
-    local result = parse("execi 60 " .. cmd)
+    local cmd = type == 4
+        and "/usr/bin/curl -4 -m 5 -s https://ipv4.icanhazip.com/"
+        or "/usr/bin/curl -6 -m 5 -s https://ipv6.icanhazip.com/"
+    local result = run_shell_cmd(cmd)
     if debug_wan then
         local log = io.open("/tmp/conky_curl_debug.log", "a")
         if log then
@@ -611,8 +627,10 @@ function fetch_wan_ip(type)
     end
 end
 function fetch_vpn_ip(type)
-    local cmd = type == 4 and "natpmpc -g 10.2.0.1 | grep \"Public IP address\" | awk '{print $5}'" or "/usr/bin/curl -m 2 -s https://v6.ipinfo.io/ip"
-    local result = parse("execi 60 " .. cmd)
+    local cmd = type == 4
+        and "natpmpc -g 10.2.0.1 | grep \"Public IP address\" | awk '{print $5}'"
+        or "/usr/bin/curl -6 -m 5 -s https://v6.ipinfo.io/ip"
+    local result = run_shell_cmd(cmd)
     if debug_wan then
         local log = io.open("/tmp/conky_curl_debug.log", "a")
         if log then

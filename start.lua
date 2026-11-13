@@ -363,14 +363,14 @@ function draw_net()
         "Total up:    " .. upload_total(),
     }
 
-    local pub_prefix = wan_ip6:sub(1, 15)
-    local vpn_prefix = vpn_ip6:sub(1, 15)
     if use_wan_ip then
-        table.insert(vals, "PUB IPv4:    " .. wan_ip4)
+        local pub_prefix = (wan_ip6 and wan_ip6 ~= "None") and wan_ip6:sub(1, 15) or "?"
+        table.insert(vals, "PUB IPv4:    " .. (wan_ip4 or "?"))
         table.insert(vals, "PUB IPv6:    " .. pub_prefix .. ":/48")
-        table.insert(vals, "VPN IPv4:    " .. vpn_ip4)
-        --table.insert(vals, "VPN IPv6:    " .. vpn_prefix .. ":/48")
-        table.insert(vals, "VPN IPv6:    " .. vpn_ip6)
+        table.insert(vals, "VPN IPv4:    " .. (vpn_ip4 or "?"))
+        -- local vpn_prefix = (vpn_ip6 and vpn_ip6 ~= "None") and vpn_ip6:sub(1, 15) or "?"
+        -- table.insert(vals, "VPN IPv6:    " .. vpn_prefix .. ":/48")
+        table.insert(vals, "VPN IPv6:    " .. (vpn_ip6 or "?"))
     end
 
     lanip6_values = local_ip6_lan():gsub("%s+", "")
